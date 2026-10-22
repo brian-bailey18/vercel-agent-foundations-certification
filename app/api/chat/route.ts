@@ -1,7 +1,16 @@
-import { createAgentUIStreamResponse } from "ai";
-import { shoppingAgent } from "@/lib/agent";
+import { chatFlow } from "@/lib/workflows/chat-flow";
+import { createModelCallToUIChunkTransform } from "@ai-sdk/workflow";
+import type { UIMessage } from "ai";
+import { createUIMessageStreamResponse } from "ai";
+import { start } from "workflow/api";
 
-export const POST = async (req: Request) => {
-  const { messages } = await req.json();
-  return createAgentUIStreamResponse({ agent: shoppingAgent, uiMessages: messages });
-};
+export async function POST(req: Request) {
+  const { messages }: { messages: UIMessage[] } = await req.json();
+  const run = await start(chatFlow, [messages]);
+  return createUIMessageStreamResponse({
+    stream: run.readable.pipeThrough(createModelCallToUIChunkTransform()),
+    headers: {
+      "x-workflow-run-id": run.runId,
+    },
+  });
+}
